@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Enterprise Hybrid AD Attack & Detection Lab</title>
+<style>
+  :root{
+    --bg:#0a0d0a;
+    --panel:#0f1510;
+    --line:#1e2a1e;
+    --text:#c9d6c9;
+    --dim:#5f7a5f;
+    --amber:#e0a339;
+    --red:#d9534f;
+    --green:#5fd97a;
+    --blue:#4fa3d9;
+    font-family:"JetBrains Mono", "IBM Plex Mono", monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);}
+  body{
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    line-height:1.55;
+  }
+  a{color:var(--blue);}
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px;}
+
+  /* HERO */
+  header.hero{
+    border-bottom:1px solid var(--line);
+    padding:64px 0 48px;
+    position:relative;
+    overflow:hidden;
+  }
+  .scan{
+    position:absolute; inset:0; pointer-events:none; opacity:.06;
+    background:repeating-linear-gradient(0deg, #fff 0px, #fff 1px, transparent 1px, transparent 3px);
+  }
+  .kicker{color:var(--amber);font-size:13px;letter-spacing:.02em;}
+  h1{
+    font-size:clamp(28px,4.2vw,44px);
+    margin:14px 0 18px;
+    color:#eef5ee;
+    font-weight:600;
+    max-width:16ch;
+  }
+  .lede{color:var(--dim);max-width:62ch;font-size:15px;}
+  .badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px;}
+  .badge{
+    border:1px solid var(--line);padding:5px 10px;border-radius:3px;
+    font-size:12px;color:var(--dim);
+  }
+
+  section{padding:48px 0;border-bottom:1px solid var(--line);}
+  h2{color:#eef5ee;font-size:20px;font-weight:600;margin:0 0 8px;}
+  .sec-note{color:var(--dim);font-size:13.5px;margin:0 0 28px;max-width:65ch;}
+
+  /* ARCHITECTURE DIAGRAM (svg) */
+  .diagram{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:20px;overflow-x:auto;}
+  .diagram svg{display:block;min-width:640px;width:100%;height:auto;}
+  .diagram-legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--dim);}
+  .diagram-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+  /* KILL CHAIN */
+  .chain{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--panel);}
+  .chain-row{
+    display:grid;grid-template-columns:120px 1fr 140px;gap:16px;
+    padding:14px 18px;border-bottom:1px solid var(--line);font-size:13.5px;align-items:baseline;
+  }
+  .chain-row:last-child{border-bottom:none;}
+  .chain-stage{color:var(--amber);font-size:12px;}
+  .chain-desc{color:var(--text);}
+  .chain-desc small{color:var(--dim);display:block;font-size:11.5px;margin-top:2px;}
+  .chain-mitre{color:var(--dim);font-size:11.5px;text-align:right;}
+
+  /* DEMO */
+  .demo-shell{border:1px solid var(--line);border-radius:4px;background:var(--panel);overflow:hidden;}
+  .demo-toolbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;border-bottom:1px solid var(--line);background:#0c110c;
+  }
+  .demo-title{font-size:12px;color:var(--dim);}
+  .demo-controls{display:flex;gap:8px;}
+  button.ctl{
+    background:transparent;border:1px solid var(--line);color:var(--text);
+    padding:7px 14px;border-radius:3px;font-family:inherit;font-size:12.5px;cursor:pointer;
+  }
+  button.ctl:hover{border-color:var(--green);color:var(--green);}
+  button.ctl:disabled{opacity:.35;cursor:default;border-color:var(--line);color:var(--text);}
+
+  .demo-body{display:grid;grid-template-columns:1fr 1fr;min-height:360px;}
+  @media (max-width:720px){.demo-body{grid-template-columns:1fr;}}
+  .attack-pane, .siem-pane{padding:16px;}
+  .attack-pane{border-right:1px solid var(--line);}
+  @media (max-width:720px){.attack-pane{border-right:none;border-bottom:1px solid var(--line);}}
+  .pane-label{font-size:11px;color:var(--dim);margin-bottom:12px;}
+  .log-line{font-size:12.5px;margin-bottom:8px;opacity:0;transform:translateY(4px);animation:in .3s forwards;}
+  @keyframes in{to{opacity:1;transform:translateY(0);}}
+  .log-line .t{color:var(--dim);margin-right:8px;}
+  .log-line.info .msg{color:var(--text);}
+  .log-line.warn .msg{color:var(--amber);}
+  .log-line.crit .msg{color:var(--red);}
+  .alert-card{
+    border:1px solid var(--red);background:rgba(217,83,79,.08);
+    border-radius:3px;padding:10px 12px;margin-top:6px;margin-bottom:10px;
+    font-size:12px;opacity:0;animation:in .3s forwards;
+  }
+  .alert-card .head{color:var(--red);font-weight:600;margin-bottom:4px;}
+  .alert-card .meta{color:var(--dim);}
+  .status-line{
+    padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim);
+    display:flex;justify-content:space-between;background:#0c110c;
+  }
+  .status-line .live{color:var(--green);}
+
+  /* stack list */
+  .stack{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media (max-width:640px){.stack{grid-template-columns:1fr;}}
+  .stack-item{border:1px solid var(--line);border-radius:4px;padding:14px 16px;background:var(--panel);}
+  .stack-item .k{font-size:11px;color:var(--amber);margin-bottom:6px;}
+  .stack-item .v{font-size:13px;color:var(--text);}
+
+  footer{padding:36px 0 60px;color:var(--dim);font-size:12px;}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="scan"></div>
+  <div class="wrap">
+    <div class="kicker">// standout project</div>
+    <h1>Enterprise Hybrid AD Attack & Detection Lab</h1>
+    <p class="lede">
+      Most CTF labs teach you to break one box. This one teaches you what happens after —
+      how a single misconfigured trust relationship or over-privileged service account turns into
+      domain compromise, and what it actually looks like on the defensive side while it happens.
+      Every attack path here is mirrored by a detection built to catch it.
+    </p>
+    <div class="badges">
+      <span class="badge">Active Directory</span>
+      <span class="badge">Azure AD Hybrid Join</span>
+      <span class="badge">Sysmon + Sigma</span>
+      <span class="badge">MITRE ATT&CK mapped</span>
+      <span class="badge">Purple team format</span>
+    </div>
+  </div>
+</header>
+
+<section id="architecture">
+  <div class="wrap">
+    <h2>Lab architecture</h2>
+    <p class="sec-note">
+      A small hybrid identity environment, sized to be buildable on a single host with nested
+      virtualization: one on-prem forest, one Azure AD tenant synced via Entra Connect, and a
+      logging tier that sees everything before the attacker does.
+    </p>
+    <div class="diagram">
+      <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" font-family="monospace">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#5f7a5f"/>
+          </marker>
+        </defs>
+        <!-- on-prem box -->
+        <rect x="30" y="30" width="380" height="230" rx="4" fill="none" stroke="#1e2a1e"/>
+        <text x="46" y="52" fill="#e0a339" font-size="12">ON-PREM FOREST</text>
+
+        <rect x="50" y="70" width="150" height="46" rx="3" fill="#0f1510" stroke="#4fa3d9"/>
+        <text x="60" y="98" fill="#c9d6c9" font-size="12">DC01 (2019)</text>
+
+        <rect x="230" y="70" width="150" height="46" rx="3" fill="#0f1510" stroke="#1e2a1e"/>
+        <text x="240" y="98" fill="#c9d6c9" font-size="12">Entra Connect</text>
+
+        <rect x="50" y="140" width="150" height="46" rx="3" fill="#0f1510" stroke="#1e2a1e"/>
+        <text x="60" y="168" fill="#c9d6c9" font-size="12">FILE01 / SQL01</text>
+
+        <rect x="230" y="140" width="150" height="46" rx="3" fill="#0f1510" stroke="#1e2a1e"/>
+        <text x="240" y="168" fill="#c9d6c9" font-size="12">WKS-Finance</text>
+
+        <rect x="50" y="210" width="330" height="34" rx="3" fill="#0f1510" stroke="#d9534f"/>
+        <text x="60" y="232" fill="#d9534f" font-size="12">breach box (initial foothold)</text>
+
+        <!-- cloud box -->
+        <rect x="490" y="30" width="380" height="140" rx="4" fill="none" stroke="#1e2a1e"/>
+        <text x="506" y="52" fill="#e0a339" font-size="12">AZURE AD / ENTRA ID</text>
+        <rect x="510" y="70" width="150" height="46" rx="3" fill="#0f1510" stroke="#1e2a1e"/>
+        <text x="520" y="98" fill="#c9d6c9" font-size="12">Synced tenant</text>
+        <rect x="690" y="70" width="150" height="46" rx="3" fill="#0f1510" stroke="#1e2a1e"/>
+        <text x="700" y="98" fill="#c9d6c9" font-size="12">Conditional Access</text>
+
+        <!-- logging tier -->
+        <rect x="490" y="200" width="380" height="130" rx="4" fill="none" stroke="#1e2a1e"/>
+        <text x="506" y="222" fill="#e0a339" font-size="12">DETECTION TIER</text>
+        <rect x="510" y="240" width="150" height="46" rx="3" fill="#0f1510" stroke="#5fd97a"/>
+        <text x="520" y="268" fill="#c9d6c9" font-size="12">Sysmon + WinEvent</text>
+        <rect x="690" y="240" width="150" height="46" rx="3" fill="#0f1510" stroke="#5fd97a"/>
+        <text x="700" y="268" fill="#c9d6c9" font-size="12">SIEM (ELK/Wazuh)</text>
+
+        <!-- arrows -->
+        <line x1="230" y1="93" x2="380" y2="93" stroke="#5f7a5f" marker-end="url(#arrow)"/>
+        <line x1="380" y1="93" x2="560" y2="93" stroke="#5f7a5f" stroke-dasharray="3,3" marker-end="url(#arrow)"/>
+        <line x1="215" y1="227" x2="510" y2="270" stroke="#d9534f" stroke-dasharray="3,3" marker-end="url(#arrow)"/>
+        <line x1="200" y1="163" x2="510" y2="263" stroke="#5f7a5f" stroke-dasharray="2,4" marker-end="url(#arrow)"/>
+        <line x1="380" y1="163" x2="690" y2="263" stroke="#5f7a5f" stroke-dasharray="2,4" marker-end="url(#arrow)"/>
+      </svg>
+      <div class="diagram-legend">
+        <span><span class="dot" style="background:#4fa3d9"></span>domain controller</span>
+        <span><span class="dot" style="background:#d9534f"></span>attacker-controlled</span>
+        <span><span class="dot" style="background:#5fd97a"></span>telemetry sink</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="killchain">
+  <div class="wrap">
+    <h2>Seeded misconfigurations & attack path</h2>
+    <p class="sec-note">Each stage exploits a specific enterprise misconfiguration and is annotated with the ATT&CK technique it represents.</p>
+    <div class="chain">
+      <div class="chain-row">
+        <div class="chain-stage">01 · access</div>
+        <div class="chain-desc">Phished credential on WKS-Finance, no LAPS or local admin restriction<small>weak local admin hygiene lets one workstation compromise become a foothold</small></div>
+        <div class="chain-mitre">T1078</div>
+      </div>
+      <div class="chain-row">
+        <div class="chain-stage">02 · discovery</div>
+        <div class="chain-desc">Unauthenticated LDAP enumeration reveals SPNs and group membership<small>anonymous bind left enabled on DC01</small></div>
+        <div class="chain-mitre">T1087 / T1069</div>
+      </div>
+      <div class="chain-row">
+        <div class="chain-stage">03 · cred access</div>
+        <div class="chain-desc">Service account with weak password is Kerberoastable<small>svc_sql runs with an SPN and a password unchanged since provisioning</small></div>
+        <div class="chain-mitre">T1558.003</div>
+      </div>
+      <div class="chain-row">
+        <div class="chain-stage">04 · lateral move</div>
+        <div class="chain-desc">Cracked service account has local admin on SQL01 and FILE01<small>flat privilege model — one account, multiple hosts</small></div>
+        <div class="chain-mitre">T1021.002</div>
+      </div>
+      <div class="chain-row">
+        <div class="chain-stage">05 · escalation</div>
+        <div class="chain-desc">Unconstrained delegation on FILE01 captures a DC-bound TGT<small>legacy delegation flag left on a domain-joined print server</small></div>
+        <div class="chain-mitre">T1187 / T1558</div>
+      </div>
+      <div class="chain-row">
+        <div class="chain-stage">06 · persistence</div>
+        <div class="chain-desc">Forged golden ticket using krbtgt hash, cloud sync abused for tenant persistence<small>full domain compromise reaches the hybrid boundary</small></div>
+        <div class="chain-mitre">T1558.001 / T1098</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="wrap">
+    <h2>Interactive walkthrough</h2>
+    <p class="sec-note">
+      A scripted replay of stage 03–04 above: Kerberoasting followed by lateral movement, shown
+      side by side with the SIEM detection that fires in response. This is mock data illustrating
+      what the real lab produces — not a live attack.
+    </p>
+
+    <div class="demo-shell">
+      <div class="demo-toolbar">
+        <div class="demo-title">replay: kerberoast_to_lateral_move.pcap</div>
+        <div class="demo-controls">
+          <button class="ctl" id="playBtn">▶ run replay</button>
+          <button class="ctl" id="resetBtn">↺ reset</button>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="attack-pane">
+          <div class="pane-label">ATTACKER SHELL</div>
+          <div id="attackLog"></div>
+        </div>
+        <div class="siem-pane">
+          <div class="pane-label">SIEM — DETECTION TIER</div>
+          <div id="siemLog"></div>
+        </div>
+      </div>
+      <div class="status-line">
+        <span id="statusText">idle — press run replay</span>
+        <span id="liveDot"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="stack">
+  <div class="wrap">
+    <h2>Toolchain</h2>
+    <div class="stack">
+      <div class="stack-item"><div class="k">virtualization</div><div class="v">Proxmox / VMware Workstation, nested lab nodes</div></div>
+      <div class="stack-item"><div class="k">identity</div><div class="v">Windows Server 2019 AD DS, Entra Connect sync</div></div>
+      <div class="stack-item"><div class="k">endpoint telemetry</div><div class="v">Sysmon (SwiftOnSecurity config), Windows Event Forwarding</div></div>
+      <div class="stack-item"><div class="k">detection logic</div><div class="v">Sigma rules → Elastic/Wazuh detection engine</div></div>
+      <div class="stack-item"><div class="k">attack simulation</div><div class="v">Atomic Red Team, GOAD-style scenario seeding</div></div>
+      <div class="stack-item"><div class="k">reporting</div><div class="v">ATT&CK Navigator coverage heatmap, purple-team writeup</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Lab environment for defensive research and personal skill-building, run in an isolated,
+    self-owned network. Not a guide for operating against systems you don't own or have authorization to test.
+  </div>
+</footer>
+
+<script>
+const attackScript = [
+  {t:"00:00.1", cls:"info", msg:"$ whoami /all"},
+  {t:"00:00.4", cls:"info", msg:"svc_finance@corp.local — WKS-Finance"},
+  {t:"00:04.2", cls:"info", msg:"$ enum-spn --domain corp.local"},
+  {t:"00:04.9", cls:"info", msg:"found SPN: MSSQLSvc/SQL01.corp.local:1433 (svc_sql)"},
+  {t:"00:07.0", cls:"warn", msg:"$ request-tgs svc_sql --format hashcat"},
+  {t:"00:07.3", cls:"warn", msg:"TGS-REP captured, encryption RC4-HMAC"},
+  {t:"00:22.6", cls:"crit", msg:"$ hashcat -m 13100 sql_hash.txt rockyou.txt"},
+  {t:"00:41.8", cls:"crit", msg:"password recovered: svc_sql → Summer2023!"},
+  {t:"00:44.0", cls:"info", msg:"$ psexec -u svc_sql \\\\SQL01 cmd.exe"},
+  {t:"00:44.6", cls:"crit", msg:"interactive shell on SQL01 as svc_sql (local admin)"},
+];
+
+const siemScript = [
+  {t:"+0.1s", cls:"info", msg:"4769 TGS request, client=svc_finance, service=MSSQLSvc/SQL01"},
+  {t:"+0.4s", cls:"warn", msg:"4769 encryption type RC4 flagged (legacy cipher)", alert:false},
+  {alert:true, delay:"+0.5s", head:"⚠ Sigma: Kerberoast Indicator", body:"Rule: single client requesting TGS for SPN account with RC4 etype, no prior Kerberoast history. Severity: high. MITRE: T1558.003"},
+  {t:"+21.0s", cls:"info", msg:"no auth events (offline cracking, no telemetry)"},
+  {t:"+43.5s", cls:"crit", msg:"4624 logon type 3, svc_sql → SQL01, source=WKS-Finance"},
+  {alert:true, delay:"+43.7s", head:"⚠ Correlation: Roasted Account Logon", body:"svc_sql authenticated to a new host within 60s of a flagged Kerberoast event. Auto-escalated to analyst queue. MITRE: T1021.002"},
+];
+
+const attackLog = document.getElementById('attackLog');
+const siemLog = document.getElementById('siemLog');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const statusText = document.getElementById('statusText');
+const liveDot = document.getElementById('liveDot');
+
+let timers = [];
+
+function clearLogs(){
+  attackLog.innerHTML = "";
+  siemLog.innerHTML = "";
+  statusText.textContent = "idle — press run replay";
+  liveDot.textContent = "";
+  timers.forEach(id => clearTimeout(id));
+  timers = [];
+  playBtn.disabled = false;
+}
+
+function addLine(container, cls, timeLabel, msg){
+  const div = document.createElement('div');
+  div.className = 'log-line ' + cls;
+  div.innerHTML = '<span class="t">'+timeLabel+'</span><span class="msg">'+msg+'</span>';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function addAlert(container, head, body){
+  const div = document.createElement('div');
+  div.className = 'alert-card';
+  div.innerHTML = '<div class="head">'+head+'</div><div class="meta">'+body+'</div>';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function runReplay(){
+  clearLogs();
+  playBtn.disabled = true;
+  statusText.textContent = "replaying…";
+  liveDot.innerHTML = '<span class="live">● live</span>';
+
+  attackScript.forEach((line, i) => {
+    const id = setTimeout(() => addLine(attackLog, line.cls, line.t, line.msg), i * 650 + 200);
+    timers.push(id);
+  });
+
+  let siemDelay = 200;
+  siemScript.forEach((line) => {
+    if(line.alert){
+      const id = setTimeout(() => addAlert(siemLog, line.head, line.body), siemDelay + 900);
+      timers.push(id);
+      siemDelay += 900;
+    } else {
+      const id = setTimeout(() => addLine(siemLog, line.cls, line.t, line.msg), siemDelay + 700);
+      timers.push(id);
+      siemDelay += 700;
+    }
+  });
+
+  const totalTime = Math.max(attackScript.length * 650 + 400, siemDelay + 1200);
+  const doneId = setTimeout(() => {
+    statusText.textContent = "replay complete — 2 detections fired, 1 host compromised";
+    liveDot.textContent = "";
+    playBtn.disabled = false;
+  }, totalTime);
+  timers.push(doneId);
+}
+
+playBtn.addEventListener('click', runReplay);
+resetBtn.addEventListener('click', clearLogs);
+</script>
+
+</body>
+</html>
